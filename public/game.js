@@ -517,9 +517,16 @@ function joinGame() {
   game.connect();
   
   // Wait for connection then join
-  setTimeout(() => {
-    game.joinGame(playerName);
-  }, 500);
+  const interval = setInterval(() => {
+    if (game.ws && game.ws.readyState === WebSocket.OPEN) {
+      console.log("Sending JOIN_GAME");
+      game.joinGame(playerName);
+      clearInterval(interval);
+    }
+  }, 100);
+  // setTimeout(() => {
+  //   game.joinGame(playerName);
+  // }, 500);
 }
 
 function startGame() {
