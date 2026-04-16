@@ -28,7 +28,7 @@ class MazeGame {
 
   connect() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = window.location.origin.replace(/^http/, 'ws');
     
     this.ws = new WebSocket(wsUrl);
 
