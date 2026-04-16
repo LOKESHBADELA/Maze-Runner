@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Maze Escape - Multiplayer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --neon-pink: #ff006e;
+      --neon-cyan: #06ffa5;
+      --neon-purple: #8338ec;
+      --neon-yellow: #ffbe0b;
+      --dark-bg: #0a0a0f;
+      --grid-bg: #151520;
+      --wall-color: #1a1a2e;
+      --path-color: #16213e;
+      --glow-intensity: 0 0 10px, 0 0 20px, 0 0 30px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Orbitron', monospace;
+      background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+      color: var(--neon-cyan);
+      overflow: hidden;
+      height: 100dvh;
+      position: relative;
+    }
+
+    /* Animated background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: 
+        linear-gradient(rgba(6, 255, 165, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(6, 255, 165, 0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+      animation: gridScroll 20s linear infinite;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    @keyframes gridScroll {
+      0% { transform: translate(0, 0); }
+      100% { transform: translate(50px, 50px); }
+    }
+
+    /* Scanline effect */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15),
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+      pointer-events: none;
+      z-index: 9999;
+      animation: scanline 8s linear infinite;
+    }
+
+    @keyframes scanline {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(100%); }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+      animation: glitchTitle 3s infinite;
+    }
+
+    @keyframes glitchTitle {
+      0%, 90%, 100% { transform: translate(0); }
+      92% { transform: translate(-2px, 2px); }
+      94% { transform: translate(2px, -2px); }
+      96% { transform: translate(-2px, -2px); }
+      98% { transform: translate(2px, 2px); }
+    }
+
+    h1 {
+      font-family: 'Press Start 2P', cursive;
+      font-size: clamp(1.5rem, 5vw, 2.5rem);
+      color: var(--neon-pink);
+      text-shadow: 
+        0 0 10px var(--neon-pink),
+        0 0 20px var(--neon-pink),
+        0 0 30px var(--neon-pink),
+        0 0 40px var(--neon-purple);
+      letter-spacing: 3px;
+      margin-bottom: 10px;
+      animation: neonPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes neonPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.8; }
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 10px var(--neon-cyan);
+      letter-spacing: 2px;
+    }
+
+    /* Game Area */
+    .game-container {
+      flex: 1;
+      display: flex;
+      gap: 20px;
+      overflow: hidden;
+    }
+
+    .main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    /* Status Bar */
+    .status-bar {
+      background: rgba(26, 26, 46, 0.8);
+      border: 2px solid var(--neon-cyan);
+      border-radius: 10px;
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 
+        0 0 20px rgba(6, 255, 165, 0.3),
+        inset 0 0 20px rgba(6, 255, 165, 0.1);
+      backdrop-filter: blur(10px);
+    }
+
+    .status-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .status-label {
+      font-size: 0.7rem;
+      color: var(--neon-yellow);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .status-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 10px var(--neon-cyan);
+    }
+
+    .timer {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.5rem;
+      color: var(--neon-pink);
+      text-shadow: 0 0 15px var(--neon-pink);
+    }
+
+    /* Maze Canvas */
+    .maze-container {
+      flex: 1;
+      background: rgba(21, 21, 32, 0.9);
+      border: 3px solid var(--neon-purple);
+      border-radius: 15px;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      box-shadow: 
+        0 0 30px rgba(131, 56, 236, 0.5),
+        inset 0 0 30px rgba(131, 56, 236, 0.1);
+      overflow: hidden;
+    }
+
+    #mazeCanvas {
+      border-radius: 10px;
+      box-shadow: 0 0 40px rgba(6, 255, 165, 0.3);
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .panel {
+      background: rgba(26, 26, 46, 0.8);
+      border: 2px solid var(--neon-cyan);
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 
+        0 0 20px rgba(6, 255, 165, 0.3),
+        inset 0 0 20px rgba(6, 255, 165, 0.1);
+      backdrop-filter: blur(10px);
+    }
+
+    .panel h3 {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.8rem;
+      color: var(--neon-yellow);
+      margin-bottom: 15px;
+      text-shadow: 0 0 10px var(--neon-yellow);
+      text-align: center;
+    }
+
+    /* Players List */
+    .players-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    .player-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: rgba(22, 33, 62, 0.6);
+      border-radius: 8px;
+      border: 1px solid rgba(6, 255, 165, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .player-item.you {
+      border-color: var(--neon-pink);
+      box-shadow: 0 0 15px rgba(255, 0, 110, 0.4);
+    }
+
+    .player-item.disconnected {
+      opacity: 0.5;
+      filter: grayscale(0.5);
+    }
+
+    .player-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 2px solid;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: bold;
+      box-shadow: 0 0 10px;
+    }
+
+    .player-name {
+      flex: 1;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .player-status {
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: rgba(6, 255, 165, 0.2);
+      color: var(--neon-cyan);
+      text-transform: uppercase;
+    }
+
+    /* Controls */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .control-btn {
+      grid-column: 2;
+      aspect-ratio: 1;
+      background: linear-gradient(135deg, rgba(6, 255, 165, 0.2), rgba(131, 56, 236, 0.2));
+      border: 2px solid var(--neon-cyan);
+      border-radius: 10px;
+      color: var(--neon-cyan);
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-shadow: 0 0 10px var(--neon-cyan);
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .control-btn:active {
+      transform: scale(0.95);
+      box-shadow: 0 0 20px var(--neon-cyan);
+    }
+
+    .control-btn.up { grid-row: 1; }
+    .control-btn.left { grid-column: 1; grid-row: 2; }
+    .control-btn.down { grid-row: 3; }
+    .control-btn.right { grid-column: 3; grid-row: 2; }
+
+    /* Buttons */
+    .btn {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, var(--neon-pink), var(--neon-purple));
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-family: 'Orbitron', monospace;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.3s;
+      box-shadow: 0 0 20px rgba(255, 0, 110, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      transform: translate(-50%, -50%);
+      transition: width 0.6s, height 0.6s;
+    }
+
+    .btn:hover::before {
+      width: 300px;
+      height: 300px;
+    }
+
+    .btn:hover {
+      box-shadow: 0 0 30px rgba(255, 0, 110, 0.8);
+      transform: translateY(-2px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
+      box-shadow: 0 0 20px rgba(6, 255, 165, 0.5);
+    }
+
+    .btn-secondary:hover {
+      box-shadow: 0 0 30px rgba(6, 255, 165, 0.8);
+    }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border: 3px solid var(--neon-cyan);
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 
+        0 0 50px rgba(6, 255, 165, 0.5),
+        inset 0 0 50px rgba(6, 255, 165, 0.1);
+      animation: modalSlideIn 0.5s ease-out;
+      text-align: center;
+    }
+
+    @keyframes modalSlideIn {
+      from {
+        transform: translateY(-100px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .modal h2 {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.5rem;
+      color: var(--neon-pink);
+      margin-bottom: 20px;
+      text-shadow: 0 0 20px var(--neon-pink);
+    }
+
+    .modal input {
+      width: 100%;
+      padding: 15px;
+      background: rgba(10, 10, 15, 0.8);
+      border: 2px solid var(--neon-cyan);
+      border-radius: 10px;
+      color: var(--neon-cyan);
+      font-family: 'Orbitron', monospace;
+      font-size: 1rem;
+      margin-bottom: 20px;
+      box-shadow: inset 0 0 10px rgba(6, 255, 165, 0.2);
+    }
+
+    .modal input:focus {
+      outline: none;
+      border-color: var(--neon-pink);
+      box-shadow: 
+        inset 0 0 10px rgba(255, 0, 110, 0.2),
+        0 0 20px rgba(255, 0, 110, 0.5);
+    }
+
+    /* Winner Animation */
+    .winner-banner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: linear-gradient(135deg, rgba(255, 0, 110, 0.95), rgba(131, 56, 236, 0.95));
+      border: 4px solid var(--neon-yellow);
+      border-radius: 20px;
+      padding: 40px;
+      text-align: center;
+      box-shadow: 
+        0 0 60px rgba(255, 190, 11, 0.8),
+        inset 0 0 40px rgba(255, 190, 11, 0.3);
+      animation: winnerPulse 1s ease-in-out infinite;
+      z-index: 100;
+    }
+
+    @keyframes winnerPulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -50%) scale(1.05); }
+    }
+
+    .winner-banner h2 {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 2rem;
+      color: white;
+      margin-bottom: 20px;
+      text-shadow: 0 0 30px var(--neon-yellow);
+      animation: winnerGlow 0.5s ease-in-out infinite;
+    }
+
+    @keyframes winnerGlow {
+      0%, 100% { text-shadow: 0 0 30px var(--neon-yellow); }
+      50% { text-shadow: 0 0 50px var(--neon-yellow), 0 0 70px var(--neon-yellow); }
+    }
+
+    /* Connection Status */
+    .connection-status {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 10px 20px;
+      background: rgba(26, 26, 46, 0.9);
+      border: 2px solid;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      z-index: 1000;
+      box-shadow: 0 0 20px;
+      animation: statusFade 0.3s ease-in;
+    }
+
+    @keyframes statusFade {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .connection-status.connected {
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+      box-shadow: 0 0 20px rgba(6, 255, 165, 0.5);
+    }
+
+    .connection-status.disconnected {
+      border-color: var(--neon-pink);
+      color: var(--neon-pink);
+      box-shadow: 0 0 20px rgba(255, 0, 110, 0.5);
+    }
+
+    /* Responsive Design */
+    @media (max-width: 1024px) {
+      .game-container {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        flex-direction: row;
+      }
+
+      .panel {
+        flex: 1;
+      }
+
+      .controls-grid {
+        grid-template-columns: repeat(3, 60px);
+        justify-content: center;
+      }
+
+      .control-btn {
+        width: 60px;
+        height: 60px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 10px;
+        padding-bottom: 220px;
+      }
+
+      h1 {
+        font-size: 1.2rem;
+      }
+
+      .subtitle {
+        font-size: 0.7rem;
+      }
+
+      .status-bar {
+        padding: 10px;
+        flex-wrap: wrap;
+      }
+
+      .sidebar {
+        flex-direction: column;
+      }
+
+       /* Shrink the player list on mobile to save space */
+      .players-list {
+        max-height: 80px; 
+      }
+
+      /* Magic Fix: Float the controls panel at the bottom of the screen */
+      .sidebar .panel:nth-child(2) {
+        position: fixed;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 95%;
+        z-index: 500;
+        background: rgba(26, 26, 46, 0.95); /* Solid background so lines don't bleed through */
+        padding-bottom: 10px;
+      }
+
+      .controls-grid {
+        grid-template-columns: repeat(3, 70px);
+      }
+
+      .control-btn {
+        width: 70px;
+        height: 70px;
+        font-size: 1.5rem;
+      }
+    }
+
+    /* Loading Animation */
+    .loading {
+      display: inline-block;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(10, 10, 15, 0.5);
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--neon-cyan);
+      border-radius: 10px;
+      box-shadow: 0 0 10px var(--neon-cyan);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--neon-pink);
+      box-shadow: 0 0 15px var(--neon-pink);
+    }
+  </style>
+</head>
+<body>
+  <!-- Connection Status -->
+  <div id="connectionStatus" class="connection-status connected">
+    <span id="connectionText">CONNECTED</span>
+  </div>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1>⚡ MAZE ESCAPE ⚡</h1>
+      <div class="subtitle">DISTRIBUTED MULTIPLAYER</div>
+    </header>
+
+    <!-- Game Container -->
+    <div class="game-container">
+      <!-- Main Game Area -->
+      <div class="main-area">
+        <!-- Status Bar -->
+        <div class="status-bar">
+          <div class="status-item">
+            <div class="status-label">Players</div>
+            <div class="status-value" id="playerCount">0</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Time</div>
+            <div class="timer" id="gameTimer">00:00</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Status</div>
+            <div class="status-value" id="gameStatus">WAITING</div>
+          </div>
+        </div>
+
+        <!-- Maze Canvas -->
+        <div class="maze-container">
+          <canvas id="mazeCanvas"></canvas>
+          
+          <!-- Winner Banner (hidden by default) -->
+          <div id="winnerBanner" style="display: none;" class="winner-banner">
+            <h2>🏆 WINNER! 🏆</h2>
+            <div id="winnerName" style="font-size: 1.5rem; color: var(--neon-yellow); margin-bottom: 20px;"></div>
+            <button class="btn" onclick="resetGame()">PLAY AGAIN</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <!-- Players Panel -->
+        <div class="panel">
+          <h3>👥 PLAYERS</h3>
+          <div class="players-list" id="playersList">
+            <div style="text-align: center; color: var(--neon-cyan); opacity: 0.6;">
+              Waiting for players<span class="loading">...</span>
+            </div>
+          </div>
+          <button class="btn" id="startBtn" style="width: 100%; margin-top: 15px;" onclick="startGame()" disabled>
+            START GAME
+          </button>
+        </div>
+
+        <!-- Controls Panel -->
+        <div class="panel">
+          <h3>🎮 CONTROLS</h3>
+          <div class="controls-grid">
+            <button class="control-btn up" onclick="move('UP')" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform=''">▲</button>
+            <button class="control-btn left" onclick="move('LEFT')" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform=''">◄</button>
+            <button class="control-btn down" onclick="move('DOWN')" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform=''">▼</button>
+            <button class="control-btn right" onclick="move('RIGHT')" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform=''">►</button>
+          </div>
+          <button class="btn btn-secondary" style="width: 100%; margin-top: 15px;" onclick="resetGame()">
+            RESET
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Join Modal -->
+  <div id="joinModal" class="modal active">
+    <div class="modal-content">
+      <h2>ENTER THE MAZE</h2>
+      <input 
+        type="text" 
+        id="playerNameInput" 
+        placeholder="Enter your name..." 
+        maxlength="15"
+        autocomplete="off"
+      />
+      <button class="btn" onclick="joinGame()" style="width: 100%;">
+        JOIN GAME
+      </button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
