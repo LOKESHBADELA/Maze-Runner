@@ -164,7 +164,7 @@ class GameState {
       position: null,
       connected: true,
       lastHeartbeat: Date.now(),
-      timeOffset: 0 // Add this
+      // timeOffset: 0 // Add this
     };
     this.players.set(playerId, playerData);
     return playerData;
@@ -498,7 +498,7 @@ function handleMessage(ws, data) {
     case 'TIME_RESPONSE': {
       const playerId = clients.get(ws);
       const { clientTime, receivedServerTime } = payload;
-      clockSync.handleTimeResponse(playerId, clientTime, receivedServerTime);
+      // clockSync.handleTimeResponse(playerId, clientTime, receivedServerTime);
       break;
     }
 
@@ -527,85 +527,85 @@ setInterval(() => {
 }, 10000); // Check every 10 seconds
 
 // ============= CLOCK SYNCHRONIZATION (Berkeley Algorithm) =============
-class ClockSync {
-  constructor(gameState, broadcast) {
-    this.gameState = gameState;
-    this.broadcast = broadcast;
-    this.syncInterval = null;
-    this.pendingResponses = new Map(); // playerId -> { serverTime, responseTime }
-  }
+// class ClockSync {
+//   constructor(gameState, broadcast) {
+//     this.gameState = gameState;
+//     this.broadcast = broadcast;
+//     this.syncInterval = null;
+//     this.pendingResponses = new Map(); // playerId -> { serverTime, responseTime }
+//   }
 
-  startSync(interval = 30000) { // Sync every 30 seconds
-    this.stopSync();
-    this.syncInterval = setInterval(() => {
-      this.requestTimes();
-    }, interval);
-  }
+  // startSync(interval = 30000) { // Sync every 30 seconds
+  //   this.stopSync();
+  //   this.syncInterval = setInterval(() => {
+  //     this.requestTimes();
+  //   }, interval);
+  // }
 
-  stopSync() {
-    if (this.syncInterval) {
-      clearInterval(this.syncInterval);
-      this.syncInterval = null;
-    }
-  }
+  // stopSync() {
+  //   if (this.syncInterval) {
+  //     clearInterval(this.syncInterval);
+  //     this.syncInterval = null;
+  //   }
+  // }
 
-  requestTimes() {
-    const serverTime = Date.now();
-    this.pendingResponses.clear();
+  // requestTimes() {
+  //   const serverTime = Date.now();
+  //   this.pendingResponses.clear();
 
-    // Send time request to all connected players
-    this.broadcast({
-      type: 'TIME_REQUEST',
-      serverTime: serverTime
-    });
+  //   // Send time request to all connected players
+  //   this.broadcast({
+  //     type: 'TIME_REQUEST',
+  //     serverTime: serverTime
+  //   });
 
-    // Set a timeout to process responses after 5 seconds
-    setTimeout(() => {
-      this.processResponses(serverTime);
-    }, 5000);
-  }
+  //   // Set a timeout to process responses after 5 seconds
+  //   setTimeout(() => {
+  //     this.processResponses(serverTime);
+  //   }, 5000);
+  // }
 
-  handleTimeResponse(playerId, clientTime, receivedServerTime) {
-    if (this.pendingResponses.has(playerId)) {
-      this.pendingResponses.set(playerId, {
-        clientTime: clientTime,
-        receivedServerTime: receivedServerTime
-      });
-    }
-  }
+  // handleTimeResponse(playerId, clientTime, receivedServerTime) {
+  //   if (this.pendingResponses.has(playerId)) {
+  //     this.pendingResponses.set(playerId, {
+  //       clientTime: clientTime,
+  //       receivedServerTime: receivedServerTime
+  //     });
+  //   }
+  // }
 
-  processResponses(originalServerTime) {
-    const offsets = [];
-    const now = Date.now();
+//   processResponses(originalServerTime) {
+//     const offsets = [];
+//     const now = Date.now();
 
-    this.pendingResponses.forEach((response, playerId) => {
-      const { clientTime, receivedServerTime } = response;
-      // Estimate round-trip time (RTT) and offset
-      const rtt = now - originalServerTime;
-      const offset = clientTime - (receivedServerTime + rtt / 2);
-      offsets.push(offset);
+//     this.pendingResponses.forEach((response, playerId) => {
+//       const { clientTime, receivedServerTime } = response;
+//       // Estimate round-trip time (RTT) and offset
+//       const rtt = now - originalServerTime;
+//       const offset = clientTime - (receivedServerTime + rtt / 2);
+//       offsets.push(offset);
 
-      // Store offset in player data
-      const player = this.gameState.players.get(playerId);
-      if (player) {
-        player.timeOffset = offset;
-      }
-    });
+//       // Store offset in player data
+//       const player = this.gameState.players.get(playerId);
+//       if (player) {
+//         player.timeOffset = offset;
+//       }
+//     });
 
-    if (offsets.length > 0) {
-      // Calculate average offset
-      const averageOffset = offsets.reduce((sum, off) => sum + off, 0) / offsets.length;
+//     if (offsets.length > 0) {
+//       // Calculate average offset
+//       const averageOffset = offsets.reduce((sum, off) => sum + off, 0) / offsets.length;
 
-      // Send adjustment to all players
-      this.broadcast({
-        type: 'TIME_ADJUST',
-        adjustment: -averageOffset // Negative to adjust towards average
-      });
-    }
-  }
-}
+//       // Send adjustment to all players
+//       this.broadcast({
+//         type: 'TIME_ADJUST',
+//         adjustment: -averageOffset // Negative to adjust towards average
+//       });
+//     }
+//   }
+// }
 
-const clockSync = new ClockSync(gameState, broadcast);
+// const clockSync = new ClockSync(gameState, broadcast);
 
 // ============= START SERVER =============
 const PORT = process.env.PORT || 3000;
@@ -620,14 +620,14 @@ server.listen(PORT, () => {
 ║   Open on multiple devices to play together!     ║
 ╚═══════════════════════════════════════════════════╝
   `);
-  clockSync.startSync(); // Start clock synchronization
+  // clockSync.startSync(); // Start clock synchronization
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\nShutting down server...');
   gameState.stopTimer();
-  clockSync.stopSync(); // Stop clock sync
+  // clockSync.stopSync(); // Stop clock sync
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
